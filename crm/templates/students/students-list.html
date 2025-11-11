@@ -30,7 +30,7 @@
         <select name="course" class="form-select" id="filter1" onchange="this.form.submit()">
           <option selected disabled>Course</option>
           {% for option in course_choices %}
-          <option {% if course == option.value %} selected {% endif %}  value='{{option.value}}'>{{option.label}}</option>
+          <option {% if course == option.name %} selected {% endif %}  value='{{option.name}}'>{{option.name}}</option>
 
           {% endfor %}
           
@@ -43,7 +43,7 @@
         <select name="batch" class="form-select" id="filter2" onchange="this.form.submit()">
           <option selected disabled>Batch</option>
           {% for option in batch_choices %}
-          <option {% if batch == option.value %} selected {% endif %} value="{{option.value}}">{{option.label}}</option>
+          <option {% if batch == option.name %} selected {% endif %} value="{{option.name}}">{{option.name}}</option>
           {% endfor %}
          
         </select>
@@ -54,7 +54,7 @@
         <select name="trainer" class="form-select" id="filter3" onchange="this.form.submit()" >
           <option selected disabled>Trainer</option>
           {% for option in trainer_choices %}
-          <option {% if trainer == option.value %} selected {% endif %} value="{{option.value}}">{{option.label}}</option>
+          <option {% if trainer == option.name %} selected {% endif %} value="{{option.name}}">{{option.name}}</option>
           {% endfor %}
           
         </select>

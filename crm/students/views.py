@@ -7,22 +7,50 @@ from .models import Students,CourseChoices,BatchChoices,TrainerChoices
 
 from .forms import AddStudentForm
 
-from crm.utils import generate_adm_num
+from crm.utils import generate_adm_num,generate_password,sent_email
 
 from django.db.models import Q
+
+from course.models import Course
+
+from batch.models import Batch
+
+from trainer.models import Trainer
+
+from authentication.models import Profile,OTP
+
+
+from django.db import transaction
+
+from decouple import config
+
+import threading
+
+from django.contrib.auth.decorators import login_required
+
+from django.utils.decorators import method_decorator
+
+from authentication.permissions import permitted_users
+
+
 #this import is used to apply or condition in orm query
 
 # Create your views here.
 
 
+# @method_decorator(login_required(login_url='login'),name='dispatch')
 class DashboardView(View):
     
+    
     def get(self,request,*args,**kwargs):
+        
         
         data={'title':'Dashboard'}
         
         return render(request,'students/dashboard.html',context=data)
     
+
+@method_decorator(permitted_users(['Admin','Sales']),name='dispatch')  
 class StudentListView(View):
     
     def get(self,request,*args,**kwargs):
@@ -70,24 +98,25 @@ class StudentListView(View):
         
         elif course:
             
-            students=students.filter(course=course)  
+            students=students.filter(course__name=course) #in ORM instead of course.name we use course__name 
             
         elif batch:
             
-            students=students.filter(batch=batch) 
+            students=students.filter(batch__name=batch) 
             
         elif trainer:
             
-            students=students.filter(trainer=trainer)  
+            students=students.filter(trainer__name=trainer)  
             
              
-        data={'title':'Students','students':students,'course_choices': CourseChoices,
-              'batch_choices':BatchChoices,'trainer_choices': TrainerChoices,
+        data={'title':'Students','students':students,'course_choices': Course.objects.all(),
+              'batch_choices':Batch.objects.all(),'trainer_choices': Trainer.objects.all(),
               'query':query,'course':course,'batch':batch,'trainer':trainer}
         
         return render(request,'students/students-list.html',context=data)
     
 
+@method_decorator(permitted_users(['Admin','Sales']),name='dispatch')  
 class StudentDetailsView(View):
     
     def get(self,request,*args,**kwargs):
@@ -117,6 +146,7 @@ class StudentDetailsView(View):
 
     
 # way to perform soft delete
+@method_decorator(permitted_users(['Admin','Sales']),name='dispatch')  
 class StudentDeleteView(View):
     
     def get(self,request,*args,**kwargs):
@@ -132,7 +162,7 @@ class StudentDeleteView(View):
         return redirect('students-list')    #students-list name given in url for the page
     
     
-    
+@method_decorator(permitted_users(['Admin','Sales']),name='dispatch')    
 class AddStudentView(View):
     
     form_class =  AddStudentForm
@@ -140,6 +170,8 @@ class AddStudentView(View):
     def get(self,request,*args,**kwargs):
         
         form = self.form_class()
+        
+        # print(request.user._meta.get_fields())     #commad used to get or print fields in model
         
         data = {'form':form,'title':'Add Student'}
         
@@ -151,15 +183,45 @@ class AddStudentView(View):
         
         if form.is_valid():
             
-            student = form.save(commit=False)
+            with transaction.atomic():
             
-            adm_num = generate_adm_num()
-            
-            student.adm_num = adm_num
-            
-            student.save()
-            
-            return redirect('students-list')
+                student = form.save(commit=False)
+                
+                adm_num = generate_adm_num()
+                
+                student.adm_num = adm_num
+                
+                email = form.cleaned_data.get('email')
+                
+                password = generate_password()
+                
+                print(password)
+                
+                profile = Profile.objects.create_user(username=email,password=password,role='Student')
+                
+                OTP.objects.create(profile =profile)
+                
+                student.profile = profile
+                
+                student.save()
+                
+                recepient = student.email
+        
+                template = 'email/credentials.html'
+                
+                site_link = config('SITE_LINK')
+        
+                context = {'username':student.email,'password':password,'name':f'{student.first_name} {student.last_name}','site_link':site_link}
+        
+                title = 'Login Credentials'
+                
+                thread = threading.Thread(target=sent_email,args=(recepient,template,title,context))
+                
+                thread.start()
+        
+                # sent_email(recepient,template,title,context)
+                
+                return redirect('students-list')
         
         data ={'form':form,'title':'Add Student'}
         
@@ -213,7 +275,7 @@ class AddStudentView(View):
         #                                   batch=batch,
         #                                   trainer=trainer)
         
-        
+@method_decorator(permitted_users(['Admin','Sales']),name='dispatch')      
 class EditStudent(View):
     
     form_class = AddStudentForm
@@ -247,6 +309,8 @@ class EditStudent(View):
         data = {'form':form}
         
         return render(request,'students/edit-student.html',context=data)
+        
+        
         
         
         
